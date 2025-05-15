@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle, XCircle, HelpCircle, Loader2 , X} from 'lucide-react';
+import axios from 'axios';
 
 interface SingleVerifierProps {
   deductCredits: (amount: number) => void;
@@ -11,27 +12,48 @@ export const SingleVerifier: React.FC<SingleVerifierProps> = ({ deductCredits })
   const [status, setStatus] = useState<'valid' | 'invalid' | 'unknown' | 'loading' | ''>('');
   const [message, setMessage] = useState<string>('');
 
-  // Simulated verification function
-  const handleVerify = () => {
-    setStatus('loading');
-    setMessage('Verifying...');
-    setTimeout(() => {
-      // Simulate random verification result
-      const results: Array<"valid" | "invalid" | "unknown"> = ["valid", "invalid", "unknown"];
-      const randomResult = results[Math.floor(Math.random() * results.length)];
-      setStatus(randomResult);
+  const API_KEY = import.meta.env.VITE_API_KEY;
+  // console.log('API_KEY:', API_KEY);
 
-      if (randomResult === 'valid') {
-        setMessage('Email is valid');
-      } else if (randomResult === 'invalid') {
-        setMessage('Email is invalid');
+  const verifyEmail = async (email: string) => {
+    try {
+      setStatus('loading');
+      setMessage('Verifying...');
+      const response = await axios.get(
+        `https://emailvalidation.abstractapi.com/v1/?api_key=${API_KEY}&email=${encodeURIComponent(email)}`
+      );
+
+      const deliverability = response.data.deliverability;
+      const emailMessage = response.data.is_valid_format.text;
+
+      if (deliverability === 'DELIVERABLE') {
+        setStatus('valid');
+        setMessage(`Valid: ${emailMessage}`);
+      } else if (deliverability === 'UNDELIVERABLE') {
+        setStatus('invalid');
+        setMessage(`Invalid: ${emailMessage}`);
       } else {
-        setMessage('Email status is unknown');
+        setStatus('unknown');
+        setMessage(`Unknown: ${emailMessage}`);
       }
 
+      // Deduct credits after successful verification
       deductCredits(1);
-    }, 1000);
-    
+    } catch (error) {
+      console.error('Verification Error:', error);
+      setStatus('invalid');
+      setMessage('Error during verification');
+    }
+  };
+
+  // Trigger the verification
+  const handleVerify = (e) => {
+    e.preventDefault();
+    if (email.trim()) {
+      verifyEmail(email);
+    } else {
+      setMessage('Please enter a valid email');
+    }
   };
 
   return (
@@ -117,7 +139,7 @@ export const SingleVerifier: React.FC<SingleVerifierProps> = ({ deductCredits })
 
         {/* Verify Button */}
         <button
-          onClick={handleVerify}
+          onClick={(e)=> handleVerify(e)}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
         >
           Verify
